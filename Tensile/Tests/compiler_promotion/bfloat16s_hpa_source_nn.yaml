@@ -31,7 +31,7 @@ BenchmarkProblems:
         - PrefetchGlobalRead: [True]
         - ThreadTile:
           - [ 2, 4 ]
-          - [ 16, 8 ]
+          # - [ 16, 8 ]
         - WorkGroup:
           - [ 32,  4,  1 ]
         - DepthU: [8]
