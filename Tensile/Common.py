@@ -267,6 +267,8 @@ globalParameters["LazyLibraryLoading"] = False # Load library and code object fi
 
 globalParameters["IgnoreAsmCapCache"] = False # Ignore checking for discrepancies between derived and cached asm caps
 
+globalParameters["ExperimentalLogicDir"] = "/experimental/"
+
 # Save a copy - since pytest doesn't re-run this initialization code and YAML files can override global settings - odd things can happen
 defaultGlobalParameters = deepcopy(globalParameters)
 
@@ -1262,6 +1264,14 @@ validParameters = {
     "UnrollMajorLDSA":             [False, True],
     "UnrollMajorLDSB":             [False, True],
 
+    # Allocate dedicated vgpr for local read with packing
+    #   False: use tmp vgpr. Less vgpr usage, but not best for local read scheduling
+    #   True: use dedicated vgpr for local read with packing. Best for local read scheduling, but need more vgpr
+    # This is effective only when we need packing (UnrollMajorLDSA (or B) is False and bpe is less than 4 (HasEccHalf case).
+    # Apply this to HasEccHalf case only.
+    # Not effective for PrefetchLocalRead <= 1
+    "VgprForLocalReadPacking":     [False, True],
+
     # tinkered with adding extra syncs or waits in the assembly kernels to see if it would improve the sequencing between workgroups, "fully synchronous scheduling" is WAY more promising; this can be deprecated
     "PerformanceSyncLocation":    list(range(-1, 16*16+1)),
     "PerformanceWaitLocation":    list(range(-1, 16*16+1)),
@@ -1353,6 +1363,7 @@ defaultBenchmarkCommonParameters = [
     {"TransposeLDS":              [ 0 ] },
     {"UnrollMajorLDSA":           [ False ] },
     {"UnrollMajorLDSB":           [ False ] },
+    {"VgprForLocalReadPacking":   [ False ] },
     {"MaxOccupancy":              [ 40 ] },
     {"VectorWidth":               [ -1 ] },
     {"VectorStore":               [ -1 ] },
@@ -2166,11 +2177,6 @@ def assignGlobalParameters( config ):
     if os.name == "nt":
       globalParameters["CurrentISA"] = (9,0,6)
       printWarning("Failed to detect ISA so forcing (gfx906) on windows")
-
-  # TODO Remove this when rocm-smi supports gfx940
-  if globalParameters["CurrentISA"] == (9,4,0) or globalParameters["CurrentISA"] == (9,4,1) or globalParameters["CurrentISA"] == (9,4,2):
-    printWarning("HardwareMonitor currently disabled for gfx940/941/942")
-    globalParameters["HardwareMonitor"] = False
 
   # For ubuntu platforms, call dpkg to grep the version of hip-clang.  This check is platform specific, and in the future
   # additional support for yum, dnf zypper may need to be added.  On these other platforms, the default version of
