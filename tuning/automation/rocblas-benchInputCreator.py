@@ -49,20 +49,34 @@ typeIndexToName = {0: "f32_r", 1: "f64_r", 2: "f32_c", 3: "f64_c", 4: "f16_r", 5
 def parseArgs():
     argParser = argparse.ArgumentParser()
 
-    h = {"libLogic" : "Input library logic file",
-         "outDir"   : "Output directory for rocBLAS-bench yaml files",
-         "verify"   : "Also output verify version of yaml files",
-         "initial"  : "Matrix initialization: hpl, trig, int. The default is trig for non Int8 datatype, and int for Int8.",
-         "duration" : "total benchmark duration in seconds. Default is 0 (10/2 iterations)"
+    h = {"libLogic"   : "Input library logic file",
+         "outDir"     : "Output directory for rocBLAS-bench yaml files",
+         "verify"     : "Also output verify version of yaml files",
+         "initial"    : "Matrix initialization: hpl, trig, int. The default is trig for non Int8 datatype, and int for Int8.",
+        #  "duration"   : "total benchmark duration in seconds. Default is 0 (10/2 iterations)",
+         "init_bench" : "intial output of rocblas-bench to get approx gemm time"
     }
 
     argParser.add_argument("libLogic", metavar="logic-file", type=str, help=h["libLogic"])
     argParser.add_argument("outDir", metavar="output-dir", type=str, help=h["outDir"])
     argParser.add_argument("--verify", "-v", action="store_true", help=h["verify"])
     argParser.add_argument("--initialization", "-i", action="store", type=str, default = 'trig',  help=h["initial"])
-    argParser.add_argument("--duration", "-d", action="store", type=float, default = 0.0,  help=h["duration"])
+    # argParser.add_argument("--duration", "-d", action="store", type=float, default = 0.0,  help=h["duration"])
+    argParser.add_argument("--init_bench", "-ib", action="store", type=str, default = None,  help=h["init_bench"])
 
     return argParser.parse_args()
+
+def removeSpaces(txt):
+    i = 0
+    while txt[i] == ' ' and i < len(txt): i+=1
+    txt = txt[i:]
+    i = len(txt)-1
+    while txt[i] == ' ' and i >= 0: i-=1
+    txt = txt[0:i+1]
+    return txt
+
+def isNumericData(inputString):
+    return all(char.isdigit() or char == '.' for char in inputString)
 
 def getProblemType(problem):
     # transA/B, a/b/c/d/compute_type
@@ -175,13 +189,40 @@ def getSizeParams(size, transA, transB):
 
     return sizeDict
 
-
 def dumpYaml(outDir, outputfile,postfix, content):
     name = outputfile+postfix
     benchPath = os.path.join(outDir, name)
     with open(benchPath, "w") as f:
         yaml.safe_dump(content, f, default_flow_style=None, sort_keys=False, width=5000)
         f.write(f"# End of {name} \n")
+
+def parseTextLogData(bench_log):
+    """
+    This file parses log text data 
+    and returns the perf data.
+    """
+    tFile = open(bench_log, 'r')
+    tData = tFile.readlines()
+    DATA = []
+
+
+    for line in tData:
+        fields = line.split(',')
+        if len(fields) < 14 : continue
+        fields[-1] = fields[-1][:-1] # remove the newline char
+        for k in range(len(fields)):
+            fields[k] = removeSpaces(fields[k])
+            if not isNumericData(fields[k]): continue
+            fields[k] = float(fields[k])
+        DATA.append(fields)
+    
+    HEADER = DATA[0]
+    DATA = [DATA[i] for i in range(1,len(DATA),2)]
+
+    idx = HEADER.index('us')
+    time_data = [d[idx] for d in DATA]
+
+    return time_data
 
 def createYaml(args, outputfile, problem, sizeMappings, verify):
     bench = []
@@ -229,8 +270,11 @@ def createYaml(args, outputfile, problem, sizeMappings, verify):
     # check if the library is General Batched based on the library name
     generalBatched = True if "_GB.yaml" in os.path.split(args.libLogic)[-1] else False
 
+    if args.init_bench is not None:
+        time_data = parseTextLogData(args.init_bench)
+
     # create rocBLAS-bench call for each size in logic file
-    for (size, perf) in sizeMappings: # size[0] = M, size[1] = N, size[2] = batch_count, size[3] = K, size[4] = ldc, size[5] = ldd, size[6] = lda, size[7] = ldb
+    for index, (size, perf) in enumerate(sizeMappings): # size[0] = M, size[1] = N, size[2] = batch_count, size[3] = K, size[4] = ldc, size[5] = ldd, size[6] = lda, size[7] = ldb
 
         params = {}
  
@@ -247,12 +291,16 @@ def createYaml(args, outputfile, problem, sizeMappings, verify):
 
         sizeParams = getSizeParams(size, transA, transB)
 
-        if  args.duration>0.0:
-            latency = 2*sizeParams['M']*sizeParams['N']*sizeParams['K']/perf[1]/1000 # us
-            latency *= sizeParams["batch_count"] if "batch_count" in sizeParams else 1
-            cold_iters = math.ceil( args.duration* 1e6 / latency)
-            iters = cold_iters
-            coe = 1.15
+        # if  args.duration>0.0:
+        #     latency = 2*sizeParams['M']*sizeParams['N']*sizeParams['K']/perf[1]/1000 # us
+        #     latency *= sizeParams["batch_count"] if "batch_count" in sizeParams else 1
+        #     cold_iters = math.ceil( args.duration* 1e6 / latency)
+        #     iters = cold_iters
+        #     coe = 1.15
+        if args.init_bench is not None:
+            cold_iters = int(3000000/time_data[index])
+            iters = int(5000000/time_data[index])
+            coe = 1
         else:
             cold_iters = 2
             iters = 10
