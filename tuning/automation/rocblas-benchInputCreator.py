@@ -216,8 +216,14 @@ def parseTextLogData(bench_log):
             fields[k] = float(fields[k])
         DATA.append(fields)
     
+    # print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    # print(DATA)
     HEADER = DATA[0]
-    DATA = [DATA[i] for i in range(1,len(DATA),2)]
+    DATA = DATA[1:len(DATA):2]
+
+    # print(HEADER)
+    # print(DATA)
+    # print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 
     idx = HEADER.index('us')
     time_data = [d[idx] for d in DATA]
@@ -272,6 +278,8 @@ def createYaml(args, outputfile, problem, sizeMappings, verify):
 
     if args.init_bench is not None:
         time_data = parseTextLogData(args.init_bench)
+        # print("timing info - ")
+        # print(time_data)
 
     # create rocBLAS-bench call for each size in logic file
     for index, (size, perf) in enumerate(sizeMappings): # size[0] = M, size[1] = N, size[2] = batch_count, size[3] = K, size[4] = ldc, size[5] = ldd, size[6] = lda, size[7] = ldb
@@ -298,8 +306,8 @@ def createYaml(args, outputfile, problem, sizeMappings, verify):
         #     iters = cold_iters
         #     coe = 1.15
         if args.init_bench is not None:
-            cold_iters = int(3000000/time_data[index])
-            iters = int(5000000/time_data[index])
+            cold_iters = int(3000000/int(time_data[index]))
+            iters = int(5000000/int(time_data[index]))
             coe = 1
         else:
             cold_iters = 2
@@ -342,25 +350,25 @@ def createYaml(args, outputfile, problem, sizeMappings, verify):
     # write output
     if len(bench) > 0:
         dumpYaml(args.outDir, outputfile,"_bench.yaml", bench)
-        dumpYaml(args.outDir, outputfile,"_bench_beta0.yaml", bench_beta0)
-        dumpYaml(args.outDir, outputfile, "_bench_rotating.yaml", bench_rotating)
-        dumpYaml(args.outDir, outputfile, "_bench_beta0_rotating.yaml", bench_beta0_rotating)
+        # dumpYaml(args.outDir, outputfile,"_bench_beta0.yaml", bench_beta0)
+        # dumpYaml(args.outDir, outputfile, "_bench_rotating.yaml", bench_rotating)
+        # dumpYaml(args.outDir, outputfile, "_bench_beta0_rotating.yaml", bench_beta0_rotating)
         if verify:
             dumpYaml(args.outDir, outputfile, "_verify.yaml", bench_verify)
 
     if len(benchStrided) > 0:
         dumpYaml(args.outDir, outputfile, "_bench-strided.yaml", benchStrided)
-        dumpYaml(args.outDir, outputfile, "_bench-strided_beta0.yaml", benchStrided_beta0)
-        dumpYaml(args.outDir, outputfile, "_bench-strided_rotating.yaml", benchStrided_rotating)
-        dumpYaml(args.outDir, outputfile, "_bench-strided_beta0_rotating.yaml", benchStrided_beta0_rotating)
+        # dumpYaml(args.outDir, outputfile, "_bench-strided_beta0.yaml", benchStrided_beta0)
+        # dumpYaml(args.outDir, outputfile, "_bench-strided_rotating.yaml", benchStrided_rotating)
+        # dumpYaml(args.outDir, outputfile, "_bench-strided_beta0_rotating.yaml", benchStrided_beta0_rotating)
         if verify:
             dumpYaml(args.outDir, outputfile, "_verify-strided.yaml", benchStrided_verify)
 
     if len(benchGeneralBatched) > 0:
         dumpYaml(args.outDir, outputfile, "_bench-general-batched.yaml", benchGeneralBatched)
-        dumpYaml(args.outDir, outputfile, "_bench-general-batched_beta0.yaml", benchGeneralBatched_beta0)
-        dumpYaml(args.outDir, outputfile, "_bench-general-batched_rotating.yaml", benchGeneralBatched_rotating)
-        dumpYaml(args.outDir, outputfile, "_bench-general-batched_beta0_rotating.yaml", benchGeneralBatched_beta0_rotating)
+        # dumpYaml(args.outDir, outputfile, "_bench-general-batched_beta0.yaml", benchGeneralBatched_beta0)
+        # dumpYaml(args.outDir, outputfile, "_bench-general-batched_rotating.yaml", benchGeneralBatched_rotating)
+        # dumpYaml(args.outDir, outputfile, "_bench-general-batched_beta0_rotating.yaml", benchGeneralBatched_beta0_rotating)
         if verify:
             dumpYaml(args.outDir, outputfile, "_verify-general-batched.yaml", benchGeneralBatched_verify)
 
